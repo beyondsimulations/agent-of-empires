@@ -6,15 +6,28 @@ A terminal session manager for Linux and MacOS using tmux to aid in management a
 
 ## Installation
 
+**Quick install (Linux & macOS):**
+
 ```bash
-# Quick install (Linux & macOS)
-curl -fsSL https://raw.githubusercontent.com/njbrake/agent-of-empires/main/scripts/install.sh | bash
+curl -fsSL \
+  https://raw.githubusercontent.com/njbrake/agent-of-empires/main/scripts/install.sh \
+  | bash
+```
 
-# Homebrew
-brew install njbrake/aoe/aoe # update via `brew update && brew upgrade aoe`
+**Homebrew:**
 
-# Build from source
-git clone https://github.com/njbrake/agent-of-empires && cd agent-of-empires && cargo build --release
+```bash
+brew install njbrake/aoe/aoe
+```
+
+Update via `brew update && brew upgrade aoe`.
+
+**Build from source:**
+
+```bash
+git clone https://github.com/njbrake/agent-of-empires
+cd agent-of-empires
+cargo build --release
 ```
 
 ## How It Works

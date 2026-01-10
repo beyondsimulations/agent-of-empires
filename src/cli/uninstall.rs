@@ -47,25 +47,12 @@ pub async fn run(args: UninstallArgs) -> Result<()> {
 
     let mut found_items: Vec<FoundItem> = Vec::new();
 
-    // Check for Homebrew installation
-    let homebrew_installed = if Command::new("brew")
-        .arg("list")
-        .arg("agent-of-empires")
+    // Check for Homebrew installation (formula is named "aoe")
+    let homebrew_installed = Command::new("brew")
+        .args(["list", "aoe"])
         .output()
-        .is_ok()
-    {
-        if let Ok(output) = Command::new("brew")
-            .arg("list")
-            .arg("agent-of-empires")
-            .output()
-        {
-            output.status.success()
-        } else {
-            false
-        }
-    } else {
-        false
-    };
+        .map(|output| output.status.success())
+        .unwrap_or(false);
 
     if homebrew_installed {
         found_items.push(FoundItem {
@@ -75,15 +62,27 @@ pub async fn run(args: UninstallArgs) -> Result<()> {
         println!("Found: Homebrew installation");
     }
 
-    // Check common binary locations
-    let binary_locations = [
+    // Check common binary locations for both "aoe" and "agent-of-empires"
+    let mut binary_locations = vec![
+        home_dir.join(".local/bin/aoe"),
+        PathBuf::from("/usr/local/bin/aoe"),
+        home_dir.join("bin/aoe"),
         home_dir.join(".local/bin/agent-of-empires"),
         PathBuf::from("/usr/local/bin/agent-of-empires"),
         home_dir.join("bin/agent-of-empires"),
     ];
 
+    // Also check the currently running binary's location
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Ok(canonical) = current_exe.canonicalize() {
+            if !binary_locations.contains(&canonical) {
+                binary_locations.push(canonical);
+            }
+        }
+    }
+
     for loc in &binary_locations {
-        if loc.exists() {
+        if loc.exists() && !found_items.iter().any(|i| i.path == *loc) {
             found_items.push(FoundItem {
                 item_type: "binary".to_string(),
                 path: loc.clone(),
@@ -147,7 +146,7 @@ pub async fn run(args: UninstallArgs) -> Result<()> {
 
     for item in &found_items {
         match item.item_type.as_str() {
-            "homebrew" => println!("  • Homebrew package: agent-of-empires"),
+            "homebrew" => println!("  • Homebrew package: aoe"),
             "binary" => println!("  • Binary: {}", item.path.display()),
             "data" => {
                 if args.keep_data {
@@ -198,9 +197,7 @@ pub async fn run(args: UninstallArgs) -> Result<()> {
         match item.item_type.as_str() {
             "homebrew" => {
                 println!("Removing Homebrew package...");
-                let _ = Command::new("brew")
-                    .args(["uninstall", "agent-of-empires"])
-                    .status();
+                let _ = Command::new("brew").args(["uninstall", "aoe"]).status();
                 println!("✓ Homebrew package removed");
             }
             "binary" => {
