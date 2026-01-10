@@ -300,4 +300,258 @@ mod tests {
         // First item should be ungrouped session
         matches!(items[0], Item::Session { .. });
     }
+
+    #[test]
+    fn test_toggle_collapsed() {
+        let mut inst = Instance::new("test", "/tmp/t");
+        inst.group_path = "work".to_string();
+        let instances = vec![inst];
+        let mut tree = GroupTree::new_with_groups(&instances, &[]);
+
+        let group = tree.groups_by_path.get("work").unwrap();
+        assert!(!group.collapsed);
+
+        tree.toggle_collapsed("work");
+
+        let group = tree.groups_by_path.get("work").unwrap();
+        assert!(group.collapsed);
+
+        tree.toggle_collapsed("work");
+
+        let group = tree.groups_by_path.get("work").unwrap();
+        assert!(!group.collapsed);
+    }
+
+    #[test]
+    fn test_toggle_collapsed_nonexistent_group() {
+        let instances: Vec<Instance> = vec![];
+        let mut tree = GroupTree::new_with_groups(&instances, &[]);
+        tree.toggle_collapsed("nonexistent");
+    }
+
+    #[test]
+    fn test_collapsed_group_hides_sessions_in_flatten() {
+        let mut inst1 = Instance::new("work-session", "/tmp/w");
+        inst1.group_path = "work".to_string();
+        let instances = vec![inst1];
+        let mut tree = GroupTree::new_with_groups(&instances, &[]);
+
+        let items_expanded = flatten_tree(&tree, &instances);
+        let session_count_expanded = items_expanded
+            .iter()
+            .filter(|i| matches!(i, Item::Session { .. }))
+            .count();
+        assert_eq!(session_count_expanded, 1);
+
+        tree.toggle_collapsed("work");
+        let items_collapsed = flatten_tree(&tree, &instances);
+        let session_count_collapsed = items_collapsed
+            .iter()
+            .filter(|i| matches!(i, Item::Session { .. }))
+            .count();
+        assert_eq!(session_count_collapsed, 0);
+    }
+
+    #[test]
+    fn test_collapsed_group_still_shows_in_flatten() {
+        let mut inst = Instance::new("test", "/tmp/t");
+        inst.group_path = "work".to_string();
+        let instances = vec![inst];
+        let mut tree = GroupTree::new_with_groups(&instances, &[]);
+
+        tree.toggle_collapsed("work");
+        let items = flatten_tree(&tree, &instances);
+
+        let group_items: Vec<_> = items
+            .iter()
+            .filter(|i| matches!(i, Item::Group { .. }))
+            .collect();
+        assert_eq!(group_items.len(), 1);
+    }
+
+    #[test]
+    fn test_collapsed_state_in_flattened_item() {
+        let mut inst = Instance::new("test", "/tmp/t");
+        inst.group_path = "work".to_string();
+        let instances = vec![inst];
+        let mut tree = GroupTree::new_with_groups(&instances, &[]);
+
+        let items = flatten_tree(&tree, &instances);
+        if let Some(Item::Group { collapsed, .. }) = items
+            .iter()
+            .find(|i| matches!(i, Item::Group { path, .. } if path == "work"))
+        {
+            assert!(!collapsed);
+        }
+
+        tree.toggle_collapsed("work");
+        let items = flatten_tree(&tree, &instances);
+        if let Some(Item::Group { collapsed, .. }) = items
+            .iter()
+            .find(|i| matches!(i, Item::Group { path, .. } if path == "work"))
+        {
+            assert!(*collapsed);
+        }
+    }
+
+    #[test]
+    fn test_nested_group_collapse_hides_children() {
+        let mut inst1 = Instance::new("parent-session", "/tmp/p");
+        inst1.group_path = "parent".to_string();
+        let mut inst2 = Instance::new("child-session", "/tmp/c");
+        inst2.group_path = "parent/child".to_string();
+        let instances = vec![inst1, inst2];
+        let mut tree = GroupTree::new_with_groups(&instances, &[]);
+
+        let items = flatten_tree(&tree, &instances);
+        let group_count = items
+            .iter()
+            .filter(|i| matches!(i, Item::Group { .. }))
+            .count();
+        assert_eq!(group_count, 2);
+
+        tree.toggle_collapsed("parent");
+        let items = flatten_tree(&tree, &instances);
+        let group_count_collapsed = items
+            .iter()
+            .filter(|i| matches!(i, Item::Group { .. }))
+            .count();
+        assert_eq!(group_count_collapsed, 1);
+    }
+
+    #[test]
+    fn test_session_count_includes_nested() {
+        let mut inst1 = Instance::new("parent-session", "/tmp/p");
+        inst1.group_path = "parent".to_string();
+        let mut inst2 = Instance::new("child-session", "/tmp/c");
+        inst2.group_path = "parent/child".to_string();
+        let instances = vec![inst1, inst2];
+        let tree = GroupTree::new_with_groups(&instances, &[]);
+
+        let items = flatten_tree(&tree, &instances);
+        if let Some(Item::Group { session_count, .. }) = items
+            .iter()
+            .find(|i| matches!(i, Item::Group { path, .. } if path == "parent"))
+        {
+            assert_eq!(*session_count, 2);
+        }
+    }
+
+    #[test]
+    fn test_delete_group() {
+        let mut inst = Instance::new("test", "/tmp/t");
+        inst.group_path = "work".to_string();
+        let instances = vec![inst];
+        let mut tree = GroupTree::new_with_groups(&instances, &[]);
+
+        assert!(tree.group_exists("work"));
+        tree.delete_group("work");
+        assert!(!tree.group_exists("work"));
+    }
+
+    #[test]
+    fn test_delete_group_removes_children() {
+        let mut inst1 = Instance::new("parent-session", "/tmp/p");
+        inst1.group_path = "parent".to_string();
+        let mut inst2 = Instance::new("child-session", "/tmp/c");
+        inst2.group_path = "parent/child".to_string();
+        let instances = vec![inst1, inst2];
+        let mut tree = GroupTree::new_with_groups(&instances, &[]);
+
+        assert!(tree.group_exists("parent"));
+        assert!(tree.group_exists("parent/child"));
+
+        tree.delete_group("parent");
+
+        assert!(!tree.group_exists("parent"));
+        assert!(!tree.group_exists("parent/child"));
+    }
+
+    #[test]
+    fn test_create_group() {
+        let instances: Vec<Instance> = vec![];
+        let mut tree = GroupTree::new_with_groups(&instances, &[]);
+
+        assert!(!tree.group_exists("new-group"));
+        tree.create_group("new-group");
+        assert!(tree.group_exists("new-group"));
+    }
+
+    #[test]
+    fn test_create_nested_group_creates_parents() {
+        let instances: Vec<Instance> = vec![];
+        let mut tree = GroupTree::new_with_groups(&instances, &[]);
+
+        tree.create_group("a/b/c");
+        assert!(tree.group_exists("a"));
+        assert!(tree.group_exists("a/b"));
+        assert!(tree.group_exists("a/b/c"));
+    }
+
+    #[test]
+    fn test_item_depth() {
+        let ungrouped = Instance::new("ungrouped", "/tmp/u");
+        let mut inst1 = Instance::new("root-level", "/tmp/r");
+        inst1.group_path = "root".to_string();
+        let mut inst2 = Instance::new("nested", "/tmp/n");
+        inst2.group_path = "root/child".to_string();
+        let instances = vec![ungrouped, inst1, inst2];
+        let tree = GroupTree::new_with_groups(&instances, &[]);
+        let items = flatten_tree(&tree, &instances);
+
+        for item in &items {
+            match item {
+                Item::Session { id, depth } if !id.is_empty() => {
+                    if *depth == 0 {
+                        continue;
+                    }
+                    assert!(*depth >= 1);
+                }
+                Item::Group { path, depth, .. } => {
+                    if path == "root" {
+                        assert_eq!(*depth, 0);
+                    } else if path == "root/child" {
+                        assert_eq!(*depth, 1);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    #[test]
+    fn test_get_roots_returns_only_top_level() {
+        let mut inst1 = Instance::new("test1", "/tmp/1");
+        inst1.group_path = "alpha".to_string();
+        let mut inst2 = Instance::new("test2", "/tmp/2");
+        inst2.group_path = "alpha/nested".to_string();
+        let mut inst3 = Instance::new("test3", "/tmp/3");
+        inst3.group_path = "beta".to_string();
+        let instances = vec![inst1, inst2, inst3];
+        let tree = GroupTree::new_with_groups(&instances, &[]);
+
+        let roots = tree.get_roots();
+        assert_eq!(roots.len(), 2);
+
+        let root_names: Vec<_> = roots.iter().map(|g| &g.name).collect();
+        assert!(root_names.contains(&&"alpha".to_string()));
+        assert!(root_names.contains(&&"beta".to_string()));
+    }
+
+    #[test]
+    fn test_groups_sorted_alphabetically() {
+        let mut inst1 = Instance::new("z-session", "/tmp/z");
+        inst1.group_path = "zebra".to_string();
+        let mut inst2 = Instance::new("a-session", "/tmp/a");
+        inst2.group_path = "apple".to_string();
+        let mut inst3 = Instance::new("m-session", "/tmp/m");
+        inst3.group_path = "mango".to_string();
+        let instances = vec![inst1, inst2, inst3];
+        let tree = GroupTree::new_with_groups(&instances, &[]);
+
+        let roots = tree.get_roots();
+        assert_eq!(roots[0].name, "apple");
+        assert_eq!(roots[1].name, "mango");
+        assert_eq!(roots[2].name, "zebra");
+    }
 }

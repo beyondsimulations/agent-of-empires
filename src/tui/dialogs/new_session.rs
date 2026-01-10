@@ -42,6 +42,18 @@ impl NewSessionDialog {
         }
     }
 
+    #[cfg(test)]
+    fn new_with_tools(tools: Vec<&'static str>, path: String) -> Self {
+        Self {
+            title: String::new(),
+            path,
+            group: String::new(),
+            tool_index: 0,
+            focused_field: 0,
+            available_tools: tools,
+        }
+    }
+
     pub fn handle_key(&mut self, key: KeyEvent) -> DialogResult<NewSessionData> {
         let has_tool_selection = self.available_tools.len() > 1;
         let max_field = if has_tool_selection { 4 } else { 3 };
@@ -232,5 +244,233 @@ impl NewSessionDialog {
             ])
         };
         frame.render_widget(Paragraph::new(hint), chunks[4]);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::KeyModifiers;
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    fn shift_key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::SHIFT)
+    }
+
+    fn single_tool_dialog() -> NewSessionDialog {
+        NewSessionDialog::new_with_tools(vec!["claude"], "/tmp/project".to_string())
+    }
+
+    fn multi_tool_dialog() -> NewSessionDialog {
+        NewSessionDialog::new_with_tools(vec!["claude", "opencode"], "/tmp/project".to_string())
+    }
+
+    #[test]
+    fn test_initial_state() {
+        let dialog = single_tool_dialog();
+        assert_eq!(dialog.title, "");
+        assert_eq!(dialog.path, "/tmp/project");
+        assert_eq!(dialog.group, "");
+        assert_eq!(dialog.focused_field, 0);
+        assert_eq!(dialog.tool_index, 0);
+    }
+
+    #[test]
+    fn test_esc_cancels() {
+        let mut dialog = single_tool_dialog();
+        let result = dialog.handle_key(key(KeyCode::Esc));
+        assert!(matches!(result, DialogResult::Cancel));
+    }
+
+    #[test]
+    fn test_enter_submits_with_auto_title() {
+        let mut dialog = single_tool_dialog();
+        let result = dialog.handle_key(key(KeyCode::Enter));
+        match result {
+            DialogResult::Submit(data) => {
+                assert_eq!(data.title, "project");
+                assert_eq!(data.path, "/tmp/project");
+                assert_eq!(data.group, "");
+                assert_eq!(data.tool, "claude");
+            }
+            _ => panic!("Expected Submit"),
+        }
+    }
+
+    #[test]
+    fn test_enter_preserves_custom_title() {
+        let mut dialog = single_tool_dialog();
+        dialog.title = "My Custom Title".to_string();
+        let result = dialog.handle_key(key(KeyCode::Enter));
+        match result {
+            DialogResult::Submit(data) => {
+                assert_eq!(data.title, "My Custom Title");
+            }
+            _ => panic!("Expected Submit"),
+        }
+    }
+
+    #[test]
+    fn test_tab_cycles_fields_single_tool() {
+        let mut dialog = single_tool_dialog();
+        assert_eq!(dialog.focused_field, 0);
+
+        dialog.handle_key(key(KeyCode::Tab));
+        assert_eq!(dialog.focused_field, 1);
+
+        dialog.handle_key(key(KeyCode::Tab));
+        assert_eq!(dialog.focused_field, 2);
+
+        dialog.handle_key(key(KeyCode::Tab));
+        assert_eq!(dialog.focused_field, 0);
+    }
+
+    #[test]
+    fn test_tab_cycles_fields_multi_tool() {
+        let mut dialog = multi_tool_dialog();
+        assert_eq!(dialog.focused_field, 0);
+
+        dialog.handle_key(key(KeyCode::Tab));
+        assert_eq!(dialog.focused_field, 1);
+
+        dialog.handle_key(key(KeyCode::Tab));
+        assert_eq!(dialog.focused_field, 2);
+
+        dialog.handle_key(key(KeyCode::Tab));
+        assert_eq!(dialog.focused_field, 3);
+
+        dialog.handle_key(key(KeyCode::Tab));
+        assert_eq!(dialog.focused_field, 0);
+    }
+
+    #[test]
+    fn test_backtab_cycles_fields_reverse() {
+        let mut dialog = single_tool_dialog();
+        assert_eq!(dialog.focused_field, 0);
+
+        dialog.handle_key(shift_key(KeyCode::BackTab));
+        assert_eq!(dialog.focused_field, 2);
+
+        dialog.handle_key(shift_key(KeyCode::BackTab));
+        assert_eq!(dialog.focused_field, 1);
+
+        dialog.handle_key(shift_key(KeyCode::BackTab));
+        assert_eq!(dialog.focused_field, 0);
+    }
+
+    #[test]
+    fn test_char_input_to_title() {
+        let mut dialog = single_tool_dialog();
+        dialog.handle_key(key(KeyCode::Char('H')));
+        dialog.handle_key(key(KeyCode::Char('i')));
+        assert_eq!(dialog.title, "Hi");
+    }
+
+    #[test]
+    fn test_char_input_to_path() {
+        let mut dialog = single_tool_dialog();
+        dialog.handle_key(key(KeyCode::Tab));
+        dialog.handle_key(key(KeyCode::Char('/')));
+        dialog.handle_key(key(KeyCode::Char('a')));
+        assert_eq!(dialog.path, "/tmp/project/a");
+    }
+
+    #[test]
+    fn test_char_input_to_group() {
+        let mut dialog = single_tool_dialog();
+        dialog.handle_key(key(KeyCode::Tab));
+        dialog.handle_key(key(KeyCode::Tab));
+        dialog.handle_key(key(KeyCode::Char('w')));
+        dialog.handle_key(key(KeyCode::Char('o')));
+        dialog.handle_key(key(KeyCode::Char('r')));
+        dialog.handle_key(key(KeyCode::Char('k')));
+        assert_eq!(dialog.group, "work");
+    }
+
+    #[test]
+    fn test_backspace_removes_char() {
+        let mut dialog = single_tool_dialog();
+        dialog.title = "Hello".to_string();
+        dialog.handle_key(key(KeyCode::Backspace));
+        assert_eq!(dialog.title, "Hell");
+    }
+
+    #[test]
+    fn test_backspace_on_empty_field() {
+        let mut dialog = single_tool_dialog();
+        dialog.handle_key(key(KeyCode::Backspace));
+        assert_eq!(dialog.title, "");
+    }
+
+    #[test]
+    fn test_tool_selection_left_right() {
+        let mut dialog = multi_tool_dialog();
+        dialog.focused_field = 3;
+        assert_eq!(dialog.tool_index, 0);
+
+        dialog.handle_key(key(KeyCode::Right));
+        assert_eq!(dialog.tool_index, 1);
+
+        dialog.handle_key(key(KeyCode::Right));
+        assert_eq!(dialog.tool_index, 0);
+
+        dialog.handle_key(key(KeyCode::Left));
+        assert_eq!(dialog.tool_index, 1);
+    }
+
+    #[test]
+    fn test_tool_selection_space() {
+        let mut dialog = multi_tool_dialog();
+        dialog.focused_field = 3;
+        assert_eq!(dialog.tool_index, 0);
+
+        dialog.handle_key(key(KeyCode::Char(' ')));
+        assert_eq!(dialog.tool_index, 1);
+
+        dialog.handle_key(key(KeyCode::Char(' ')));
+        assert_eq!(dialog.tool_index, 0);
+    }
+
+    #[test]
+    fn test_tool_selection_ignored_on_text_field() {
+        let mut dialog = multi_tool_dialog();
+        dialog.focused_field = 0;
+        dialog.handle_key(key(KeyCode::Char(' ')));
+        assert_eq!(dialog.title, " ");
+        assert_eq!(dialog.tool_index, 0);
+    }
+
+    #[test]
+    fn test_tool_selection_ignored_single_tool() {
+        let mut dialog = single_tool_dialog();
+        dialog.focused_field = 3;
+        dialog.handle_key(key(KeyCode::Left));
+        assert_eq!(dialog.tool_index, 0);
+    }
+
+    #[test]
+    fn test_submit_with_selected_tool() {
+        let mut dialog = multi_tool_dialog();
+        dialog.focused_field = 3;
+        dialog.handle_key(key(KeyCode::Right));
+        dialog.title = "Test".to_string();
+
+        let result = dialog.handle_key(key(KeyCode::Enter));
+        match result {
+            DialogResult::Submit(data) => {
+                assert_eq!(data.tool, "opencode");
+            }
+            _ => panic!("Expected Submit"),
+        }
+    }
+
+    #[test]
+    fn test_unknown_key_continues() {
+        let mut dialog = single_tool_dialog();
+        let result = dialog.handle_key(key(KeyCode::F(1)));
+        assert!(matches!(result, DialogResult::Continue));
     }
 }

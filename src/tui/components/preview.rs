@@ -140,3 +140,72 @@ fn shorten_path(path: &str) -> String {
     }
     path.to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_shorten_path_with_home() {
+        if let Some(home) = dirs::home_dir() {
+            if let Some(home_str) = home.to_str() {
+                let path = format!("{}/projects/myapp", home_str);
+                let shortened = shorten_path(&path);
+                assert_eq!(shortened, "~/projects/myapp");
+            }
+        }
+    }
+
+    #[test]
+    fn test_shorten_path_without_home_prefix() {
+        let path = "/tmp/some/path";
+        let shortened = shorten_path(path);
+        assert_eq!(shortened, "/tmp/some/path");
+    }
+
+    #[test]
+    fn test_shorten_path_exact_home() {
+        if let Some(home) = dirs::home_dir() {
+            if let Some(home_str) = home.to_str() {
+                let shortened = shorten_path(home_str);
+                assert_eq!(shortened, "~");
+            }
+        }
+    }
+
+    #[test]
+    fn test_shorten_path_relative() {
+        let path = "relative/path";
+        let shortened = shorten_path(path);
+        assert_eq!(shortened, "relative/path");
+    }
+
+    #[test]
+    fn test_shorten_path_empty() {
+        let path = "";
+        let shortened = shorten_path(path);
+        assert_eq!(shortened, "");
+    }
+
+    #[test]
+    fn test_shorten_path_similar_prefix_not_home() {
+        if let Some(home) = dirs::home_dir() {
+            if let Some(home_str) = home.to_str() {
+                let path = format!("{}extra/not/home", home_str);
+                let shortened = shorten_path(&path);
+                assert_eq!(shortened, format!("~extra/not/home"));
+            }
+        }
+    }
+
+    #[test]
+    fn test_shorten_path_preserves_trailing_slash() {
+        if let Some(home) = dirs::home_dir() {
+            if let Some(home_str) = home.to_str() {
+                let path = format!("{}/projects/", home_str);
+                let shortened = shorten_path(&path);
+                assert_eq!(shortened, "~/projects/");
+            }
+        }
+    }
+}
