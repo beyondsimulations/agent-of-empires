@@ -194,6 +194,11 @@ impl App {
                 Action::AttachSession(id) => {
                     self.attach_session(&id, terminal)?;
                 }
+                Action::SwitchProfile(profile) => {
+                    let storage = Storage::new(&profile)?;
+                    let tools = self.home.available_tools();
+                    self.home = HomeView::new(storage, tools)?;
+                }
             }
         }
 
@@ -272,6 +277,7 @@ impl App {
 pub enum Action {
     Quit,
     AttachSession(String),
+    SwitchProfile(String),
 }
 
 #[cfg(test)]
