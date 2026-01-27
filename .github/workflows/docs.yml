@@ -8,9 +8,10 @@ on:
       - 'website/**'
       - 'assets/**'
       - 'book.toml'
+      - 'scripts/build-site.sh'
+      - 'scripts/install.sh'
       - 'src/**'
       - 'xtask/**'
-      - 'scripts/install.sh'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
@@ -34,43 +35,21 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install mdBook
-        run: cargo install mdbook
+      - name: Install mdbook
+        run: |
+          curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.4.40/mdbook-v0.4.40-x86_64-unknown-linux-gnu.tar.gz | tar -xz
+          sudo mv mdbook /usr/local/bin/
 
       - name: Generate CLI documentation
         run: cargo xtask gen-docs
 
-      - name: Create dist directory
-        run: mkdir -p dist
-
-      - name: Build landing page
-        run: cp website/index.html dist/
-
-      - name: Copy assets
-        run: |
-          mkdir -p dist/assets
-          cp assets/logo.png dist/assets/
-          cp assets/logo.svg dist/assets/
-          cp assets/social-preview.png dist/assets/
-          cp theme/favicon.png dist/assets/
-          # Copy demo.gif if it exists (generated separately)
-          if [ -f docs/assets/demo.gif ]; then
-            cp docs/assets/demo.gif dist/assets/
-          fi
-
-      - name: Copy install script
-        run: cp scripts/install.sh dist/install.sh
-
-      - name: Build documentation
-        run: mdbook build
-
-      - name: Move docs to dist/docs
-        run: mv book dist/docs
+      - name: Build site
+        run: ./scripts/build-site.sh
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist/
+          path: dist
 
   deploy:
     environment:

@@ -38,6 +38,10 @@ cp "$ROOT_DIR/assets/logo.svg" "$DIST_DIR/assets/"
 cp "$ROOT_DIR/assets/logo.png" "$DIST_DIR/assets/"
 cp "$ROOT_DIR/assets/social-preview.png" "$DIST_DIR/assets/" 2>/dev/null || true
 cp "$ROOT_DIR/assets/social-preview.svg" "$DIST_DIR/assets/" 2>/dev/null || true
+cp "$ROOT_DIR/theme/favicon.png" "$DIST_DIR/assets/" 2>/dev/null || true
+if [ -f "$ROOT_DIR/docs/assets/demo.gif" ]; then
+  cp "$ROOT_DIR/docs/assets/demo.gif" "$DIST_DIR/assets/"
+fi
 
 # 5. Copy install script
 echo "Copying install script..."
