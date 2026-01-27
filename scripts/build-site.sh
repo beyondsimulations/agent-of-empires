@@ -40,7 +40,14 @@ cp "$ROOT_DIR/assets/social-preview.png" "$DIST_DIR/assets/" 2>/dev/null || true
 cp "$ROOT_DIR/assets/social-preview.svg" "$DIST_DIR/assets/" 2>/dev/null || true
 cp "$ROOT_DIR/theme/favicon.png" "$DIST_DIR/assets/" 2>/dev/null || true
 if [ -f "$ROOT_DIR/docs/assets/demo.gif" ]; then
-  cp "$ROOT_DIR/docs/assets/demo.gif" "$DIST_DIR/assets/"
+  # Verify it's an actual GIF, not a Git LFS pointer
+  if head -c 6 "$ROOT_DIR/docs/assets/demo.gif" | grep -q "GIF8"; then
+    cp "$ROOT_DIR/docs/assets/demo.gif" "$DIST_DIR/assets/"
+    echo "  - demo.gif copied ($(du -h "$ROOT_DIR/docs/assets/demo.gif" | cut -f1))"
+  else
+    echo "WARNING: demo.gif appears to be a Git LFS pointer, not actual content"
+    echo "  Content: $(head -c 50 "$ROOT_DIR/docs/assets/demo.gif")"
+  fi
 fi
 
 # 5. Copy install script
