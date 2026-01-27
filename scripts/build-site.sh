@@ -79,7 +79,7 @@ echo ""
 echo "Build complete! Output in: $DIST_DIR"
 echo ""
 echo "Directory structure:"
-find "$DIST_DIR" -type f | head -20 | sed "s|$DIST_DIR|dist|"
+find "$DIST_DIR" -type f -print 2>/dev/null | head -20 | sed "s|$DIST_DIR|dist|" || true
 echo ""
 echo "To preview locally:"
 echo "  cd $DIST_DIR && python3 -m http.server 8000"
