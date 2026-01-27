@@ -75,6 +75,7 @@ environment = ["ANTHROPIC_API_KEY"]
 | `~/.gitconfig` | `/root/.gitconfig` | RO | Git config |
 | `~/.ssh/` | `/root/.ssh/` | RO | SSH keys |
 | `~/.config/opencode/` | `/root/.config/opencode/` | RO | OpenCode config |
+| `~/.vibe/` | `/root/.vibe/` | RW | Vibe config (if exists) |
 
 ### Persistent Auth Volumes
 

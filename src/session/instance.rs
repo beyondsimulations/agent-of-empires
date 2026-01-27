@@ -399,7 +399,7 @@ impl Instance {
             volumes.push(VolumeMount {
                 host_path: vibe_config.to_string_lossy().to_string(),
                 container_path: format!("{}/.vibe", CONTAINER_HOME),
-                read_only: true,
+                read_only: false,
             });
         }
 

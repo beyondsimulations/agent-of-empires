@@ -17,7 +17,10 @@ use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tracing::{debug, info};
 
-use crate::docker::{default_sandbox_image, CLAUDE_AUTH_VOLUME, OPENCODE_AUTH_VOLUME};
+use crate::docker::{
+    default_sandbox_image, CLAUDE_AUTH_VOLUME, CODEX_AUTH_VOLUME, OPENCODE_AUTH_VOLUME,
+    VIBE_AUTH_VOLUME,
+};
 
 static HAS_RUN: AtomicBool = AtomicBool::new(false);
 
@@ -30,7 +33,12 @@ pub fn run_lazy() {
     }
 
     let image = default_sandbox_image();
-    for volume in [CLAUDE_AUTH_VOLUME, OPENCODE_AUTH_VOLUME] {
+    for volume in [
+        CLAUDE_AUTH_VOLUME,
+        OPENCODE_AUTH_VOLUME,
+        VIBE_AUTH_VOLUME,
+        CODEX_AUTH_VOLUME,
+    ] {
         if let Err(e) = fix_volume_ownership(volume, image) {
             debug!("Could not fix ownership for volume {}: {}", volume, e);
         }
